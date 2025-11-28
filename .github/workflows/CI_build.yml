@@ -150,45 +150,12 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.before_build.outputs.matrix) }}
 
-    env:
-      BUILD_WRAPPER_OUT_DIR: build_wrapper_output_${{ matrix.build_platform }}_${{ matrix.build_configuration }}
-      SONAR_SCANNER_VERSION: 5.0.1.3006
-
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
-
-    - name: Install Java (for SonarScanner)
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-
-    - name: Install Build Wrapper
-      run: |
-        $sonarUrl = "https://sonarcloud.io/static/cpp/build-wrapper-win-x86-64.zip"
-        $outputFile = "build-wrapper.zip"
-        Invoke-WebRequest -Uri $sonarUrl -OutFile $outputFile
-        Expand-Archive -Path $outputFile -DestinationPath .
-        Remove-Item $outputFile
-
-    - name: Install SonarScanner
-      run: |
-        $scannerUrl = "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-windows.zip"
-        $outputFile = "sonar-scanner.zip"
-        Invoke-WebRequest -Uri $scannerUrl -OutFile $outputFile
-        Expand-Archive -Path $outputFile -DestinationPath .
-        Remove-Item $outputFile
-        Move-Item "sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}-windows" "sonar-scanner"
 
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v2
-
-    - name: Run Build Wrapper with MSBuild
-      run: |
-        .\build-wrapper-win-x86-64\build-wrapper-win-x86-64.exe --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} msbuild PowerEditor\visual.net\notepadPlus.sln /m /p:configuration="${{ matrix.build_configuration }}" /p:platform="${{ matrix.build_platform }}" /p:PlatformToolset="v143"
 
     - name: Modify resource.h N++ version to avoid confusion
       working-directory: PowerEditor\src\
@@ -255,6 +222,7 @@ jobs:
            }
            python PowerEditor\Test\xmlValidator\validator_xml.py
 
+
     - name: Run FunctionList and UrlDetection Tests for Win32 / Debug only
       if: matrix.build_platform == 'Win32' && matrix.build_configuration == 'Debug'
       working-directory: .\
@@ -276,19 +244,6 @@ jobs:
            cd ..\UrlDetection
            .\verifyUrlDetection.ps1
 
-    - name: Run SonarScanner (for x64/Release only to avoid duplicates)
-      if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: |
-        .\sonar-scanner\bin\sonar-scanner.bat `
-          -D"sonar.projectKey=your-project-key" `
-          -D"sonar.organization=your-organization" `
-          -D"sonar.cfamily.compile-commands=${{ env.BUILD_WRAPPER_OUT_DIR }}/compile_commands.json" `
-          -D"sonar.sources=PowerEditor/src,scintilla,lexilla" `
-          -D"sonar.cfamily.cache.enabled=true" `
-          -D"sonar.coverage.exclusions=**/*_test.c,**/*_test.cpp,**/test/**/*" `
-          -D"sonar.cfamily.threads=2"
 
   # build_windows_clang:
 
@@ -317,6 +272,7 @@ jobs:
     # - name: MSBuild of n++ exe
       # working-directory: PowerEditor\visual.net\
       # run: msbuild notepadPlus.sln /m /p:configuration="${{ matrix.build_configuration }}" /p:platform="${{ matrix.build_platform }}" /p:PlatformToolset="ClangCL"
+
 
   build_windows_cmake:
 
